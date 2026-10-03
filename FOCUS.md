@@ -84,3 +84,15 @@ DESTDIR="$PWD/stage" cmake --install build-x64
 bash scripts/deb/desktop/build.sh stage amd64 1.6.0+local ./dist
 bash scripts/deb/desktop/smoke.sh dist/*.deb 20
 ```
+
+### 关于上游那套 build.yaml
+
+上游的 `.github/workflows/build.yaml` 会在**任何分支**的 push 上触发，一次拉起 19 个
+平台 job。在 fork 上没有 Apple SDK 与 devkitPro，`build-macos` / `build-switch`
+必然失败，所以每次推 `focus` 都会白白多出 5 个红叉。
+
+本分支对它做了**唯一一处**改动 —— `on.push` 加 `branches-ignore: [focus]`，
+只排除我们自己的分支，其余分支（含随上游同步更新的 `yoga`）行为与上游完全一致。
+
+这是全仓库唯一主动接受的「与上游不同」的改动：将来上游若改到 `on:` 这一段，
+合并时会有一次几行的冲突，手工保留 `branches-ignore` 即可。

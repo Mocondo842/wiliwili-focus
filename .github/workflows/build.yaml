@@ -2,6 +2,11 @@ name: Build wiliwili
 
 on:
   push:
+    # 本仓库是 fork：focus 是本地改造分支，推它没有理由跑这套覆盖 19 个平台的矩阵
+    # （其中 macOS / Switch 在 fork 上必然失败，因为没有 Apple SDK 与 devkitPro）。
+    # 只排除 focus 一个分支，其余分支——包括随上游同步更新的 yoga——行为与上游完全一致。
+    branches-ignore:
+      - focus
   pull_request:
   workflow_dispatch:
     inputs:
