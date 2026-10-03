@@ -120,6 +120,9 @@ jobs:
       contents: write          # gh release 需要
       actions: read            # 下载 artifact 需要
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: 取回两个架构的 deb
         uses: actions/download-artifact@v6
         with:
@@ -131,9 +134,19 @@ jobs:
           cd dist
           sha256sum ./*.deb | tee SHA256SUMS
 
+      - name: 记录 token 权限（排障用）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          ME=$(gh api user --jq .login 2>&1 | tr '\n' ' ')
+          PERM=$(gh api "repos/${{ github.repository }}" --jq '.permissions' 2>&1 | tr '\n' ' ')
+          echo "::notice title=token::$ME $PERM"
+
       - name: 创建或更新 Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           V='${{ needs.version.outputs.version }}'
@@ -155,15 +168,26 @@ jobs:
           两个架构都已在 CI 里实装并冒烟运行过；本页附件同时提供 SHA256SUMS。
           EOF
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/*.deb dist/SHA256SUMS --clobber
+          # 排障用：把 gh 的原始输出塞进 annotation，这样没登录也能从 checks API 读到
+          fail() { echo "::error title=Release 失败::$1"; exit 1; }
+
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "release 已存在，覆盖附件"
+            if ! OUT=$(gh release upload "$TAG" dist/*.deb dist/SHA256SUMS \
+                         --repo "$REPO" --clobber 2>&1); then
+              fail "upload: $(printf '%s' "$OUT" | tr '\n' ' ' | head -c 800)"
+            fi
           else
-            gh release create "$TAG" dist/*.deb dist/SHA256SUMS \
-              --target '${{ github.sha }}' \
-              --title "Linux deb $V" \
-              --notes-file notes.md \
-              --prerelease
+            echo "release 不存在，创建"
+            if ! OUT=$(gh release create "$TAG" dist/*.deb dist/SHA256SUMS \
+                         --repo "$REPO" \
+                         --target '${{ github.sha }}' \
+                         --title "Linux deb $V" \
+                         --notes-file notes.md \
+                         --prerelease 2>&1); then
+              fail "create: $(printf '%s' "$OUT" | tr '\n' ' ' | head -c 800)"
+            fi
           fi
 
-          echo "下载页：${{ github.server_url }}/${{ github.repository }}/releases/tag/$TAG"
+          echo "下载页：${{ github.server_url }}/$REPO/releases/tag/$TAG"
 
