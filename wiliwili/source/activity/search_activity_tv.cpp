@@ -8,6 +8,7 @@
 #include <iostream>
 #include <locale>
 #include <borealis/core/thread.hpp>
+#include <borealis/core/bind.hpp>
 #include <borealis/core/touch/tap_gesture.hpp>
 
 #include "activity/search_activity_tv.hpp"
@@ -113,15 +114,23 @@ void TVSearchActivity::requestSearchSuggest() {
         [ASYNC_TOKEN](const bilibili::SearchSuggestList& result) {
             brls::Threading::sync([ASYNC_TOKEN, result]() {
                 ASYNC_RELEASE
-                this->hotsHeaderLabel->setText("wiliwili/search/tv/suggest"_i18n);
-                this->searchHots->getRecyclingGrid()->setDataSource(new DataSourceSuggest(result, &updateSearchEvent));
+                // v6 去推荐化：TV 热搜标题与列表已在布局中移除，访问它们会抛 ViewNotFoundException
+                try {
+                    this->hotsHeaderLabel->setText("wiliwili/search/tv/suggest"_i18n);
+                    this->searchHots->getRecyclingGrid()->setDataSource(
+                        new DataSourceSuggest(result, &updateSearchEvent));
+                } catch (const brls::ViewNotFoundException&) {
+                }
             });
         },
         [ASYNC_TOKEN](BILI_ERR) {
             brls::Logger::error("requestSearchSuggest: {}", error);
             brls::sync([ASYNC_TOKEN, error]() {
                 ASYNC_RELEASE
-                this->searchHots->getRecyclingGrid()->setError(error);
+                try {
+                    this->searchHots->getRecyclingGrid()->setError(error);
+                } catch (const brls::ViewNotFoundException&) {
+                }
             });
         });
 }
@@ -131,9 +140,13 @@ void TVSearchActivity::updateInputLabel() {
     if (value.empty()) {
         this->inputLabel->setText("wiliwili/search/tv/hint"_i18n);
         this->inputLabel->setTextColor(brls::Application::getTheme().getColor("font/grey"));
-        this->searchHots->getRecyclingGrid()->showSkeleton();
-        this->searchHots->requestSearch();
-        this->hotsHeaderLabel->setText("wiliwili/search/tv/hots"_i18n);
+        // v6 去推荐化：热搜标题与列表已在布局中移除，访问它们会抛 ViewNotFoundException
+        try {
+            this->searchHots->getRecyclingGrid()->showSkeleton();
+            this->searchHots->requestSearch();
+            this->hotsHeaderLabel->setText("wiliwili/search/tv/hots"_i18n);
+        } catch (const brls::ViewNotFoundException&) {
+        }
     } else {
         this->inputLabel->setText(getCurrentSearch());
         this->inputLabel->setTextColor(brls::Application::getTheme().getColor("brls/text"));
@@ -215,7 +228,11 @@ void TVSearchActivity::onContentAvailable() {
         this->search(value);
     });
 
-    searchHots->setSearchCallback(&updateSearchEvent);
+    // v6 去推荐化：TV 热搜 Tab 已从布局移除，与 search_activity.cpp 同法处理
+    try {
+        this->searchHots->setSearchCallback(&updateSearchEvent);
+    } catch (const brls::ViewNotFoundException&) {
+    }
     searchHistory->setSearchCallback(&updateSearchEvent);
     searchHistory->requestHistory();
 

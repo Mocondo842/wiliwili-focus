@@ -3,6 +3,7 @@
  */
 
 #include <borealis/core/touch/tap_gesture.hpp>
+#include <borealis/core/bind.hpp>
 
 #include "activity/search_activity.hpp"
 #include "fragment/search_tab.hpp"
@@ -44,7 +45,13 @@ void SearchActivity::onContentAvailable() {
     this->searchBox->addGestureRecognizer(new brls::TapGestureRecognizer(this->searchBox, openText));
 
     this->getUpdateSearchEvent()->subscribe([this](const std::string& s) { this->search(s); });
-    this->searchTab->getSearchHotsTab()->setSearchCallback(&updateSearchEvent);
+    // v6 去推荐化：热搜 Tab 已从布局移除。BRLS_BIND 未命中时抛 ViewNotFoundException（不返回 nullptr），
+    // 必须捕获异常；捕获后热搜 Tab 的回调自然失效，其余 Tab 不受影响。
+    try {
+        this->searchTab->getSearchHotsTab()->setSearchCallback(&updateSearchEvent);
+    } catch (const brls::ViewNotFoundException& e) {
+        brls::Logger::debug("SearchActivity: hot search tab is gone: {}", e.what());
+    }
     this->searchTab->getSearchHistoryTab()->setSearchCallback(&updateSearchEvent);
 
     this->requestSearch(SearchActivity::currentKey);
@@ -63,7 +70,7 @@ void SearchActivity::requestSearch(const std::string& key) {
     // SearchActivity 会最先触发搜索事件，在这里调整页面到默认的搜索页
     // 搜索事件在 SearchActivity 下的其他页面触发时，会根据他当前的显示状态来决定是否立刻进行搜索
     // 由此实现，重新搜索时只加载默认搜索页的结果，减少不必要的网络请求
-    this->searchTab->focusNthTab(2);
+    this->searchTab->focusNthTab(1);  // v6：热搜 Tab 已删，视频结果页前移为 index 1
     this->searchTab->getSearchVideoTab()->focusNthTab(0);
     this->searchTab->getSearchHistoryTab()->requestHistory();
 }

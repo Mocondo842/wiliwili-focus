@@ -75,20 +75,7 @@
                         id="tv/search/keyboard"/>
             </brls:Box>
         </brls:Box>
-        <brls:Box
-                marginTop="20"
-                axis="column"
-                grow="1">
-            <brls:Label
-                    id="tv/search/label/hots"
-                    horizontalAlign="center"
-                    fontSize="24"
-                    text="@i18n/wiliwili/search/tv/hots"/>
-            <SearchHots
-                    id="tv/search/hots"
-                    marginTop="16"
-                    spanCount="1"/>
-        </brls:Box>
+        <!-- v6 去推荐化：TV 热搜标题 + 列表整块（父 Box 一并）移除 -->
         <brls:Box
                 marginTop="20"
                 axis="column"
