@@ -74,7 +74,11 @@ void Analytics::send() {
     session->SetCookies(cpr::Cookies{{"_ga", client_id}});
     session->SetBody(cpr::Body{content_str});
     session->PostCallback([](const cpr::Response& r) {
-        if (r.status_code != 204) {
+        if (r.status_code == 204) return;
+        if (r.status_code == 0) {
+            // 连不上统计服务器（网络受限/被墙）：与功能无关，降级为 debug，不再刷 ERROR
+            brls::Logger::debug("report event skipped (no connection): {}", r.error.message);
+        } else {
             brls::Logger::error("report event error: {} {}", r.status_code, r.error.message);
         }
     });

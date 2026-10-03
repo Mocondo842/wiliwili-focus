@@ -704,9 +704,11 @@ void VideoDetail::requestHighlightProgress(uint64_t cid) {
                 this->onHighlightProgress(result);
             });
         },
-        [ASYNC_TOKEN](BILI_ERR) {
+        [ASYNC_TOKEN, cid](BILI_ERR) {
             ASYNC_RELEASE
-            brls::Logger::error("HighlightProgress: {}", error);
+            // 该功能（高能进度条）的接口 bvc.bilivideo.com/pbp/data 上游已不再提供（实测 404），
+            // 失败已在此处兜底为空数据，不属应用错误，降级为 warning 并带上定位信息。
+            brls::Logger::warning("HighlightProgress unavailable: cid={} code={} {}", cid, code, error);
             this->onHighlightProgress(bilibili::VideoHighlightProgress{});
         });
 }

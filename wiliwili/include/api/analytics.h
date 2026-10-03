@@ -14,7 +14,9 @@
 #include "bilibili/result/analytics_result.h"
 
 // Uncomment this line to disable Google Analytics
-//#define NO_GA
+// 本地构建：本机网络到 www.google-analytics.com 不通，每次上报都失败刷屏，
+// 且该域名不可达时上报本身没有意义，因此默认关闭。需要恢复时注释掉下面这行即可。
+#define NO_GA
 
 namespace analytics {
 

@@ -19,6 +19,30 @@
 #include <SDL2/SDL_main.h>
 #endif
 
+#ifdef __GLFW__
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+
+// borealis 在 GLFWPlatform 构造时注册了自己的 GLFW 错误回调，除 OpenGL 相关的两个错误码外
+// 一律记为 ERROR。Wayland 等平台本就不支持设置窗口图标 / 窗口位置 / 置顶浮动，GLFW 仍会以
+// GLFW_FEATURE_UNAVAILABLE 回调告知，属预期行为。这里接管回调以区分二者，真正的错误仍报 ERROR。
+static void wiliwiliGlfwErrorCallback(int errorCode, const char* description) {
+    switch (errorCode) {
+        case GLFW_API_UNAVAILABLE:
+            brls::Logger::error("OpenGL is unavailable: {}", description);
+            break;
+        case GLFW_VERSION_UNAVAILABLE:
+            brls::Logger::error("OpenGL 3.2 (the minimum requirement) is not available: {}", description);
+            break;
+        case GLFW_FEATURE_UNAVAILABLE:
+            brls::Logger::debug("GLFW feature unavailable on this platform (ignored): {}", description);
+            break;
+        default:
+            brls::Logger::error("GLFW {}: {}", errorCode, description);
+    }
+}
+#endif
+
 int main(int argc, char* argv[]) {
     for (int i = 1; i < argc; i++) {
         if (std::strcmp(argv[i], "-d") == 0) {
@@ -44,6 +68,12 @@ int main(int argc, char* argv[]) {
 
     // Return directly to the desktop when closing the application (only for NX)
     brls::Application::getPlatform()->exitToHomeMode(true);
+
+#ifdef __GLFW__
+    // 接管 GLFW 错误回调：borealis 在其平台初始化时注册了自己的回调，需在创建窗口之前替换，
+    // 因为窗口创建时就会调用 Wayland 不支持的设置图标 / 位置接口。
+    glfwSetErrorCallback(wiliwiliGlfwErrorCallback);
+#endif
 
     brls::Application::createWindow("wiliwili");
     brls::Logger::info("createWindow done");
