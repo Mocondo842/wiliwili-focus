@@ -111,3 +111,59 @@ jobs:
           path: dist/*.deb
           if-no-files-found: error
           retention-days: 30
+
+  release:
+    name: 发到 Release
+    needs: [ version, deb ]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write          # gh release 需要
+      actions: read            # 下载 artifact 需要
+    steps:
+      - name: 取回两个架构的 deb
+        uses: actions/download-artifact@v6
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: 生成校验和
+        run: |
+          cd dist
+          sha256sum ./*.deb | tee SHA256SUMS
+
+      - name: 创建或更新 Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          V='${{ needs.version.outputs.version }}'
+          # tag 里不放 "+"：URL 里虽然合法，但容易在别处被当成空格
+          TAG="deb-v$(printf '%s' "$V" | tr '+' '-')"
+          echo "tag=$TAG"
+
+          cat > notes.md <<EOF
+          wiliwili「去推荐化」分支的 Linux 桌面版构建，由 GitHub Actions 从 focus 分支产出。
+
+          - 版本：$V
+          - 提交：${{ github.sha }}
+          - 构建记录：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          安装：
+
+              sudo apt install ./wiliwili_${V}_amd64.deb     # 或 _arm64.deb
+
+          两个架构都已在 CI 里实装并冒烟运行过；本页附件同时提供 SHA256SUMS。
+          EOF
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.deb dist/SHA256SUMS --clobber
+          else
+            gh release create "$TAG" dist/*.deb dist/SHA256SUMS \
+              --target '${{ github.sha }}' \
+              --title "Linux deb $V" \
+              --notes-file notes.md \
+              --prerelease
+          fi
+
+          echo "下载页：${{ github.server_url }}/${{ github.repository }}/releases/tag/$TAG"
+
