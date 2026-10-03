@@ -1,0 +1,109 @@
+name: Linux deb
+
+# 同时产出 amd64 与 arm64 的桌面版 .deb，并在 CI 里真装一次、跑一次。
+# arm64 走 GitHub 原生的 ubuntu-24.04-arm runner（公开仓库免费），不做交叉编译也不用 QEMU。
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Debian 包版本号；留空则自动生成 <CMakeLists 版本>+focus.<短 SHA>'
+        required: false
+        default: ''
+  push:
+    branches: [ focus ]
+    paths:
+      - '.github/workflows/linux-deb.yaml'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - 'wiliwili/**'
+      - 'resources/**'
+      - 'scripts/deb/desktop/**'
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: 版本号
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: v
+        run: |
+          set -euo pipefail
+          INPUT='${{ github.event.inputs.version }}'
+          if [ -n "$INPUT" ]; then
+            V="$INPUT"
+          else
+            APP="$(sed -n 's/^set(VERSION_MAJOR "\(.*\)")/\1/p' CMakeLists.txt).$(sed -n 's/^set(VERSION_MINOR "\(.*\)")/\1/p' CMakeLists.txt).$(sed -n 's/^set(VERSION_REVISION "\(.*\)")/\1/p' CMakeLists.txt)"
+            V="${APP}+focus.$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "版本号：$V"
+
+  deb:
+    name: deb-${{ matrix.arch }}
+    needs: [ version ]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, runner: ubuntu-24.04 }
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: 环境信息
+        run: |
+          echo "机器架构: $(uname -m)"
+          echo "CPU 核数: $(nproc)"
+          df -h / | tail -1
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: 安装构建依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake pkg-config \
+            zlib1g-dev libssl-dev libmpv-dev libwebp-dev \
+            libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libwayland-dev libxkbcommon-dev \
+            libdbus-1-dev libpulse-dev libudev-dev \
+            libfontconfig1-dev libfreetype6-dev
+
+      - name: 配置
+        run: |
+          cmake -B build -DPLATFORM_DESKTOP=ON -DCMAKE_BUILD_TYPE=Release \
+                -DINSTALL=ON -DCMAKE_INSTALL_PREFIX=/usr
+
+      - name: 编译
+        run: cmake --build build -j"$(nproc)"
+
+      - name: 暂存安装
+        run: DESTDIR="$PWD/stage" cmake --install build
+
+      - name: 打 deb
+        run: |
+          bash scripts/deb/desktop/build.sh stage \
+            '${{ matrix.arch }}' '${{ needs.version.outputs.version }}' dist
+
+      - name: 冒烟测试（装上去跑 20 秒）
+        continue-on-error: true
+        run: |
+          sudo apt-get install -y --no-install-recommends xvfb dbus-x11
+          bash scripts/deb/desktop/smoke.sh dist/*.deb 20
+
+      - name: 上传 deb
+        uses: actions/upload-artifact@v6
+        with:
+          name: wiliwili_${{ needs.version.outputs.version }}_${{ matrix.arch }}
+          path: dist/*.deb
+          if-no-files-found: error
+          retention-days: 30
