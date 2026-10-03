@@ -58,3 +58,29 @@ DESTDIR=/tmp/stage cmake --install build-x64
 
 依赖：`libssl-dev libmpv-dev libwebp-dev`（cpr 的 zlib-ng / curl / mongoose
 由 CMake 的 FetchContent 拉取）。
+
+## 从 GitHub Actions 取 deb（amd64 / arm64）
+
+`.github/workflows/linux-deb.yaml` 在两个**原生** runner 上同时产出桌面版 deb：
+
+| 架构 | runner | 说明 |
+|---|---|---|
+| amd64 | `ubuntu-24.04` | |
+| arm64 | `ubuntu-24.04-arm` | GitHub 自带的 arm64 机器，公开仓库免费；不交叉编译、不用 QEMU |
+
+每个架构都会把 deb 真装一遍、在 xvfb 下跑 20 秒（`scripts/deb/desktop/smoke.sh`），
+跑不起来这一次构建就是红的 —— 所以「绿」同时意味着「装得上、起得来」。
+
+触发：向 `focus` 分支 push（仅限源码/工作流相关路径，改文档不会触发），
+或在 Actions 页手动 `Run workflow`（可指定版本号）。
+
+产物在运行页的 artifact 里：`wiliwili_<版本>_amd64.deb` / `wiliwili_<版本>_arm64.deb`。
+版本号默认是 `<CMakeLists 里的版本>+focus.<短 SHA>`，例如 `1.6.0+focus.d32936c`。
+
+打包与冒烟逻辑是普通脚本，本机 docker 里同样能跑（需要 `dpkg-deb` 与 `binutils`）：
+
+```bash
+DESTDIR="$PWD/stage" cmake --install build-x64
+bash scripts/deb/desktop/build.sh stage amd64 1.6.0+local ./dist
+bash scripts/deb/desktop/smoke.sh dist/*.deb 20
+```
