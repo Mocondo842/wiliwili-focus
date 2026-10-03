@@ -349,6 +349,9 @@ void PlayerSeasonActivity::onSeasonSeriesInfo(const bilibili::SeasonSeries& resu
 }
 
 void PlayerSeasonActivity::onSeasonRecommend(const bilibili::SeasonRecommendWrapper& result) {
+    // v6 去推荐化（G6 / R10）：拦截番剧季「推荐」Tab 的创建路径。
+    // 只拦显示，不删 BasePlayerTabFragment / SeasonRecommendItem 与接口。
+    return;
     if (result.season.empty()) return;
 
     this->tabFrame->clearTab("wiliwili/player/recommend"_i18n);

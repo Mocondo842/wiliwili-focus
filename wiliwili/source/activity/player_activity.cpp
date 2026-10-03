@@ -433,6 +433,9 @@ void PlayerActivity::onUploadedVideos(const bilibili::UserUploadedVideoResultWra
 }
 
 void PlayerActivity::onRelatedVideoList(const bilibili::VideoDetailListResult& result) {
+    // v6 去推荐化（G6 / R9）：拦截「相关推荐」Tab 的创建路径。
+    // 只拦显示，不删 RecyclingGridItemRelatedVideoCard、DataSource 与接口。
+    return;
     if (result.size() <= 1) {
         return;
     }
