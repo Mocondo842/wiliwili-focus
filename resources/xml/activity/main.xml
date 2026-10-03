@@ -6,6 +6,8 @@
             axis="column"
             width="100%"
             height="100%">
+        <!-- v6 去推荐化：首页 Tab 已移除。defaultTab="0" 的语义由「首页」变为「动态」（动态即 index 0），
+                 保留数值 0，不要改成 1，否则会默认停在「我的」。 -->
         <AutoTabFrame
                 id="main/tabFrame"
                 grow="1"
@@ -14,13 +16,6 @@
                 disableNavigationDown="true"
                 defaultTab="0"
                 sidebarPosition="left">
-
-            <Tab label=""
-                 fontSize="18"
-                 icon="@res/svg/ico-home.svg"
-                 iconActivate="@res/svg/ico-home-activate.svg">
-                <HomeTab/>
-            </Tab>
 
             <Tab label=""
                  fontSize="18"
@@ -63,11 +58,25 @@
                     focusable="true"
                     highlightCornerRadius="50"
                     cornerRadius="50"
+                    marginBottom="10"
                     wireframe="false">
                 <SVGImage
                         width="48"
                         height="48"
                         SVG="@res/svg/ico-setting.svg"/>
+            </CustomButton>
+
+            <!-- v6 去推荐化：搜索入口从被移除的首页迁移到这里 -->
+            <CustomButton
+                    id="main/search"
+                    focusable="true"
+                    highlightCornerRadius="50"
+                    cornerRadius="50"
+                    wireframe="false">
+                <SVGImage
+                        width="48"
+                        height="48"
+                        SVG="@res/svg/ico-search.svg"/>
             </CustomButton>
         </brls:Box>
     </brls:Box>
